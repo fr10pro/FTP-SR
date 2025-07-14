@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Download Generator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.92);
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+            width: 100%;
+            max-width: 500px;
+            padding: 40px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+        }
+        h1 { color: #2c3e50; margin-bottom: 10px; font-size: 28px; }
+        .description { color: #7f8c8d; margin-bottom: 30px; font-size: 16px; }
+        .input-group { margin-bottom: 25px; }
+        input {
+            width: 100%;
+            padding: 14px 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 50px;
+            font-size: 16px;
+            transition: all 0.3s;
+            outline: none;
+        }
+        input:focus { border-color: #3498db; box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2); }
+        button {
+            background: linear-gradient(to right, #3498db, #2c3e50);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            padding: 14px 30px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            width: 100%;
+            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+        }
+        button:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4); }
+        button:disabled { background: #bdc3c7; cursor: not-allowed; transform: none; box-shadow: none; }
+        .result { margin-top: 30px; padding: 20px; border-radius: 12px; background: #f8f9fa; display: none; }
+        .success .result { display: block; animation: fadeIn 0.5s; }
+        .download-link {
+            display: inline-block;
+            margin-top: 15px;
+            padding: 12px 25px;
+            background: #2ecc71;
+            color: white;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.3s;
+            word-break: break-all;
+        }
+        .download-link:hover {
+            background: #27ae60;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(46, 204, 113, 0.3);
+        }
+        .error {
+            color: #e74c3c;
+            margin-top: 20px;
+            padding: 15px;
+            background: #fdeded;
+            border-radius: 8px;
+            display: none;
+        }
+        .loading { margin: 25px 0; display: none; }
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left-color: #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @media (max-width: 600px) {
+            .container { padding: 30px 20px; }
+            h1 { font-size: 24px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>File Download Generator</h1>
+        <p class="description">Convert any direct file link into a downloadable URL</p>
+        
+        <div class="input-group">
+            <input 
+                type="url" 
+                id="fileUrl" 
+                placeholder="Paste file URL here (http/https)" 
+                required
+                autocomplete="off"
+            >
+        </div>
+        
+        <button id="generateBtn">Generate Download Link</button>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Processing your file...</p>
+        </div>
+        
+        <div class="error" id="error"></div>
+        
+        <div class="result" id="result">
+            <h3>Your file is ready!</h3>
+            <p>Link expires in 30 minutes</p>
+            <a href="#" id="downloadLink" class="download-link">Download File</a>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const fileUrl = document.getElementById('fileUrl');
+            const generateBtn = document.getElementById('generateBtn');
+            const loading = document.getElementById('loading');
+            const error = document.getElementById('error');
+            const result = document.getElementById('result');
+            const downloadLink = document.getElementById('downloadLink');
+            
+            generateBtn.addEventListener('click', async () => {
+                const url = fileUrl.value.trim();
+                error.style.display = 'none';
+                result.style.display = 'none';
+                
+                if (!url) {
+                    showError('Please enter a file URL');
+                    return;
+                }
+                
+                if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                    showError('URL must start with http:// or https://');
+                    return;
+                }
+                
+                try {
+                    loading.style.display = 'block';
+                    generateBtn.disabled = true;
+                    
+                    const response = await fetch('/generate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ file_url: url })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (!response.ok) {
+                        throw new Error(data.error || 'Server error');
+                    }
+                    
+                    downloadLink.href = data.download_url;
+                    downloadLink.textContent = 'Download File';
+                    result.style.display = 'block';
+                    
+                } catch (err) {
+                    showError(err.message);
+                } finally {
+                    loading.style.display = 'none';
+                    generateBtn.disabled = false;
+                }
+            });
+            
+            function showError(message) {
+                error.textContent = message;
+                error.style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>
